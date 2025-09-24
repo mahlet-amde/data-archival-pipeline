@@ -9,6 +9,14 @@ import os
 import boto3
 from dotenv import load_dotenv
 
+def minify_json(json_data):
+  try:
+    obj = json.loads(json_data)
+    return json.dumps(obj, separators=(',', ':'))
+  except json.JSONDecodeError as e:
+    return f"Error: Invalid JSON data. {e}"
+  
+
 def main():
     s3_bucket_name = "storage-treasure-archival"
     batch_size = 10
@@ -33,7 +41,7 @@ def main():
 
     try:
         print("Populating auction candidates...")
-        cursor.execute("CALL xtivia_stage.populate_auctions_candidates(10000)")
+        # cursor.execute("CALL xtivia_stage.populate_auctions_candidates(10000)")
         
         min_max_query = "SELECT MIN(candidate_id) AS min_id, MAX(candidate_id) AS max_id FROM xtivia_stage.auctions_candidates;"
         cursor.execute(min_max_query)
@@ -62,12 +70,13 @@ def main():
               
                 closed_date_str = json_data['auction'].get('close_date')
                 auction_id = json_data['auction'].get('auction_id')
-                
+
                 if closed_date_str:
                     formatted_date = closed_date_str.strftime("year=%Y/month=%m")
                     json_data_str = json.dumps(json_data, indent=4, default=str)
+                    minified_json = minify_json(json_data_str)
                     s3_key = f"{formatted_date}/auction_{auction_id}.json"
-                    s3_manager.upload_file_to_s3(s3_bucket_name, s3_key, json_data_str)
+                    s3_manager.upload_file_to_s3(s3_bucket_name, s3_key, minified_json)
           
             current_id += 1
 
